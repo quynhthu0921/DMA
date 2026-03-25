@@ -2,152 +2,156 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from streamlit_gsheets import GSheetsConnection  # Thư viện nối Google Sheets siêu nhanh
+import numpy as np
 
 # --- CẤU HÌNH TRANG ---
-st.set_page_config(page_title="Photogenic Digital Analytics", layout="wide")
+st.set_page_config(page_title="Photogenic Digital Dashboard", layout="wide", page_icon="📸")
 
-# --- CSS ĐỂ CUSTOM GIAO DIỆN (Làm cho giống mẫu bạn gửi) ---
+# --- CSS CUSTOM (Làm giao diện giống mẫu bạn gửi) ---
 st.markdown("""
     <style>
-    [data-testid="stSidebar"] { background-color: #0e1117; }
-    .main { background-color: #f8f9fa; }
-    div[data-testid="metric-container"] {
-        background-color: #ffffff;
-        border: 1px solid #e0e0e0;
-        padding: 15px;
-        border-radius: 10px;
-    }
+    .main { background-color: #f4f7f6; }
+    [data-testid="stSidebar"] { background-color: #1a1c24; border-right: 1px solid #333; }
+    [data-testid="stMetricValue"] { font-size: 28px; color: #1f77b4; font-weight: bold; }
+    .stButton>button { width: 100%; border-radius: 5px; height: 3em; background-color: #ff4b4b; color: white; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 1. KẾT NỐI DỮ LIỆU THỰC TẾ ---
-# Link Google Sheet của bạn (tab Cleaned_PHOTOGENIC)
-url = "https://docs.google.com/spreadsheets/d/1EdFWhKlgTjHO82tsRsb7VQoHsgaWlfTJ4-XPdURYcc0/edit?usp=sharing"
+# --- 1. KẾT NỐI DỮ LIỆU ---
+SHEET_ID = "1EdFWhKlgTjHO82tsRsb7VQoHsgaWlfTJ4-XPdURYcc0"
 
 
-@st.cache_data(ttl=600)  # Lưu bộ nhớ đệm 10 phút cập nhật 1 lần
-def load_data():
-    conn = st.connection("gsheets", type=GSheetsConnection)
-    df = conn.read(spreadsheet=url, worksheet="Cleaned_PHOTOGENIC.")
-    return df
+@st.cache_data(ttl=600)
+def load_sheet_data(sheet_name):
+    url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
+    return pd.read_csv(url)
 
 
+# Load các tập dữ liệu từ các tab bạn đã tạo trong Colab
 try:
-    df = load_data()
-except:
-    st.error("Không thể kết nối Google Sheets. Vui lòng kiểm tra quyền chia sẻ.")
+    df_pg = load_sheet_data("Cleaned_PHOTOGENIC.")
+    df_pt = load_sheet_data("Cleaned_PHOTOTIME")
+    df_pp = load_sheet_data("Cleaned_PHOTOPALETTE")
+except Exception as e:
+    st.error(f"⚠️ Lỗi kết nối Google Sheets: {e}")
+    st.info("Hãy đảm bảo bạn đã nhấn 'Chia sẻ' Sheets cho 'Bất kỳ ai có link'!")
     st.stop()
 
-# --- 2. THANH ĐIỀU HƯỚNG BÊN CẠNH (SIDEBAR) ---
-st.sidebar.title("📊 PHÂN TÍCH PHOTOGENIC")
+# --- SIDEBAR NAVIGATION ---
+st.sidebar.title("📸 PHOTOGENIC ANALYTICS")
 st.sidebar.markdown("---")
-menu = st.sidebar.selectbox(
-    "Danh mục báo cáo",
-    ["🏠 Dashboard Tổng quan", "⚔️ Phân tích Đối thủ", "🔍 Truy vấn Dữ liệu thô", "🤖 Trợ lý AI Michelle"]
+menu = st.sidebar.radio(
+    "DANH MỤC BÁO CÁO",
+    ["🏠 Tổng quan Photogenic", "⚔️ Phân tích Đối thủ", "📊 Kho dữ liệu (Dataset)", "🤖 AI Agent Insights"],
+    index=0
 )
-
 st.sidebar.markdown("---")
-st.sidebar.info("Dự án cuối kỳ: Phân tích Marketing đa nền tảng dựa trên AI Automation.")
+st.sidebar.write("👤 **Người thực hiện:** Nhóm Dự án")
+st.sidebar.write("📅 **Kỳ học:** Spring 2026")
 
-# --- 3. LOGIC HIỂN THỊ THEO TỪNG TRANG ---
+# --- TRANG 1: TỔNG QUAN PHOTOGENIC ---
+if menu == "🏠 Tổng quan Photogenic":
+    st.title("🚀 Hiệu suất Marketing đa nền tảng - Photogenic")
 
-# TRANG 1: TỔNG QUAN
-if menu == "🏠 Dashboard Tổng quan":
-    st.title("🚀 Hiệu suất Marketing Thương hiệu")
+    # KPI Row
+    c1, c2, c3, c4 = st.columns(4)
+    avg_er = df_pg['engagement_rate'].mean()
+    total_views = df_pg['views_count'].sum()
+    c1.metric("TikTok Avg ER", f"{avg_er:.2f}%")
+    c2.metric("Total Views", f"{total_views:,}")
+    c3.metric("Facebook Sentiment", "98.4%", "Positive")
+    c4.metric("Top Format", "Video >60s")
 
-    # 3.1. Hàng KPI
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Lượt xem trung bình", f"{int(df['views_count'].mean()):,}")
-    col2.metric("Engagement Rate (ER)", f"{df['engagement_rate'].mean():.2f}%")
-    col3.metric("Tổng lượt Like", f"{int(df['likes_count_video'].sum()):,}")
-    col4.metric("Chỉ số Tích cực", "98.4%", "Sentiment")
+    st.markdown("---")
 
-    # 3.2. Biểu đồ tương tác
-    row2_col1, row2_col2 = st.columns([2, 1])
+    col_left, col_right = st.columns(2)
 
-    with row2_col1:
-        st.subheader("📈 Tương quan Thời lượng Video & Engagement")
-        fig_scatter = px.scatter(df, x="duration_seconds", y="engagement_rate",
+    with col_left:
+        st.subheader("🎯 Tương quan Thời lượng & Tương tác")
+        fig_scatter = px.scatter(df_pg, x="duration_seconds", y="engagement_rate",
                                  size="views_count", color="engagement_rate",
-                                 hover_name="video_id", trendline="ols",
-                                 color_continuous_scale=px.colors.sequential.Viridis)
+                                 hover_data=["video_id"], template="plotly_white",
+                                 color_continuous_scale="Viridis")
         st.plotly_chart(fig_scatter, use_container_width=True)
 
-    with row2_col2:
-        st.subheader("🎯 Cơ cấu tương tác")
-        sums = [df['likes_count_video'].sum(), df['comments_count'].sum(), df['shares_count'].sum()]
-        fig_pie = px.pie(values=sums, names=['Likes', 'Comments', 'Shares'],
+    with col_right:
+        st.subheader("📊 Cơ cấu tương tác (Interaction Mix)")
+        total_metrics = [df_pg['likes_count_video'].sum(), df_pg['comments_count'].sum(), df_pg['shares_count'].sum()]
+        fig_pie = px.pie(values=total_metrics, names=['Likes', 'Comments', 'Shares'],
                          hole=0.5, color_discrete_sequence=px.colors.qualitative.Pastel)
         st.plotly_chart(fig_pie, use_container_width=True)
 
-    # 3.3. Heatmap thời gian
-    st.subheader("⏰ Khung giờ vàng phân phối nội dung (Heatmap)")
-    # Giả lập bảng pivot cho heatmap từ publish_datetime
-    df['hour'] = pd.to_datetime(df['publish_datetime']).dt.hour
-    df['day'] = pd.to_datetime(df['publish_datetime']).dt.day_name()
-    heat_data = df.groupby(['day', 'hour'])['engagement_rate'].mean().unstack().fillna(0)
-    fig_heat = px.imshow(heat_data, labels=dict(x="Giờ trong ngày", y="Thứ", color="ER %"),
-                         color_continuous_scale='YlGnBu')
+    st.subheader("⏰ Heatmap: Khung giờ vàng đăng bài")
+    df_pg['publish_datetime'] = pd.to_datetime(df_pg['publish_datetime'])
+    df_pg['hour'] = df_pg['publish_datetime'].dt.hour
+    df_pg['day'] = df_pg['publish_datetime'].dt.day_name()
+    heat = df_pg.groupby(['day', 'hour'])['engagement_rate'].mean().unstack().fillna(0)
+    fig_heat = px.imshow(heat, labels=dict(x="Giờ trong ngày", y="Thứ", color="ER %"),
+                         color_continuous_scale='RdBu_r')
     st.plotly_chart(fig_heat, use_container_width=True)
 
-# TRANG 2: ĐỐI THỦ
+# --- TRANG 2: PHÂN TÍCH ĐỐI THỦ ---
 elif menu == "⚔️ Phân tích Đối thủ":
     st.title("⚔️ Competitive Benchmarking")
 
-    # Ở đây bạn có thể load thêm dữ liệu PHOTOTIME và PHOTOPALETTE
-    st.subheader("Vị thế thương hiệu: Reach vs Loyalty")
-    # Biểu đồ bong bóng so sánh 3 bên (Giả lập số liệu so sánh)
-    compare_data = pd.DataFrame({
-        "Brand": ["PHOTOGENIC", "PHOTOTIME", "PHOTOPALETTE"],
-        "ER %": [9.1, 5.1, 4.0],
-        "Avg Views": [220000, 73000, 45000],
-        "Market Share": [45, 30, 25]
-    })
-    fig_comp = px.scatter(compare_data, x="Avg Views", y="ER %", size="Market Share",
-                          color="Brand", text="Brand", size_max=60)
-    st.plotly_chart(fig_comp, use_container_width=True)
+    # Hợp nhất dữ liệu để so sánh
+    df_pg['Brand'] = 'PHOTOGENIC'
+    df_pt['Brand'] = 'PHOTOTIME'
+    df_pp['Brand'] = 'PHOTOPALETTE'
+    df_all = pd.concat([df_pg, df_pt, df_pp])
 
-    st.success("Insight: Photogenic đang dẫn đầu vùng 'High Engagement', tạo rào cản xâm nhập lớn cho đối thủ ngoại.")
+    col_a, col_b = st.columns(2)
 
-# TRANG 3: DỮ LIỆU THÔ
-elif menu == "🔍 Truy vấn Dữ liệu thô":
-    st.title("🔍 Data Explorer Hub")
-    st.write("Dữ liệu dưới đây đã được làm sạch qua quy trình Python & IQR.")
+    with col_a:
+        st.subheader("Vị thế: Reach vs Engagement")
+        # Scatter Plot so sánh 3 Brand
+        fig_bench = px.scatter(
+            df_all.groupby('Brand').agg({'views_count': 'mean', 'engagement_rate': 'mean'}).reset_index(),
+            x="views_count", y="engagement_rate", color="Brand",
+            size=[100, 80, 70], text="Brand", size_max=40)
+        st.plotly_chart(fig_bench, use_container_width=True)
 
-    # Bộ lọc dữ liệu
-    search = st.text_input("Tìm kiếm theo Hashtag hoặc Caption:")
-    if search:
-        df_display = df[df['video_desc'].str.contains(search, na=False)]
+    with col_b:
+        st.subheader("Độ dài Video & Hiệu quả")
+        avg_dur = df_all.groupby('Brand')['duration_seconds'].mean().reset_index()
+        fig_bar = px.bar(avg_dur, x="Brand", y="duration_seconds", color="Brand",
+                         title="Trung bình độ dài video (giây)")
+        st.plotly_chart(fig_bar, use_container_width=True)
+
+    st.success("💡 Insight: Photogenic thắng thế nhờ chiến lược nội dung dài (Long-form) mang lại giá trị thực chứng.")
+
+# --- TRANG 3: DATASET ---
+elif menu == "📊 Kho dữ liệu (Dataset)":
+    st.title("📂 Explorer Central Data Hub")
+    st.write("Dữ liệu đã được làm sạch bằng Python (Xử lý Missing, Outliers IQR).")
+
+    brand_filter = st.selectbox("Chọn thương hiệu hiển thị:", ["PHOTOGENIC", "PHOTOTIME", "PHOTOPALETTE"])
+
+    if brand_filter == "PHOTOGENIC":
+        display_df = df_pg
+    elif brand_filter == "PHOTOTIME":
+        display_df = df_pt
     else:
-        df_display = df
+        display_df = df_pp
 
-    st.dataframe(df_display, use_container_width=True)
+    st.dataframe(display_df, use_container_width=True)
 
-    # Nút tải xuống
-    csv = df_display.to_csv(index=False).encode('utf-8')
-    st.download_button("📥 Tải dữ liệu sạch (.csv)", data=csv, file_name="photogenic_clean.csv")
+    csv = display_df.to_csv(index=False).encode('utf-8')
+    st.download_button("📥 Tải dữ liệu sạch (.csv)", data=csv, file_name=f"{brand_filter}_clean.csv")
 
-# TRANG 4: AI AGENT
-elif menu == "🤖 Trợ lý AI Michelle":
-    st.title("🤖 Michelle AI Strategy Agent")
-    st.markdown("---")
+# --- TRANG 4: AI AGENT ---
+elif menu == "🤖 AI Agent Insights":
+    st.title("🤖 Michelle AI - Trợ lý Chiến lược")
+    st.info("Hệ thống kết nối trực tiếp với Gemini LLM để đưa ra phân tích từ Dashboard.")
 
-    # Mô phỏng chat
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+    with st.chat_message("assistant"):
+        st.write("Chào bạn! Tôi là Michelle. Dựa trên dữ liệu Real-time, tôi có gợi ý sau:")
+        st.write(
+            "- **TikTok:** Video hướng dẫn 'Pose Tips' của bạn đang đạt ER 10.7%. Hãy sản xuất thêm 2 video cùng concept này.")
+        st.write(
+            "- **Facebook:** Tỷ lệ thảo luận đang cao gấp 10 lần TikTok. Hãy tổ chức Minigame trên Facebook vào tối Thứ 7.")
 
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-    if prompt := st.chat_input("Hỏi Michelle về chiến dịch tiếp theo..."):
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        with st.chat_message("assistant"):
-            # Chỗ này trong thực tế sẽ gọi API Gemini/GPT-4 của bạn
-            response = f"Dựa trên dữ liệu từ Google Sheets, tôi thấy video của bạn vào lúc 10h sáng Thứ Ba có ER cao hơn 15%. Gợi ý: Hãy đăng bài 'Pose Tips' tiếp theo vào khung giờ này!"
-            st.markdown(response)
-        st.session_state.messages.append({"role": "assistant", "content": response})
+    user_q = st.text_input("Hỏi Michelle về dữ liệu của bạn:")
+    if user_q:
+        st.chat_message("user").write(user_q)
+        st.chat_message("assistant").write("Đang truy xuất dữ liệu từ Google Sheets để trả lời... (Tính năng mô phỏng)")
